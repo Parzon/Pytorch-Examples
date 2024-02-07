@@ -11,7 +11,7 @@ import data
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 Language Model')
 # Model parameters.
-parser.add_argument('--data', type=str, default='./data/wikitext-2',
+parser.add_argument('--data', type=str, default='/Users/Parzon/Downloads/GenAI/PyTorch/Pytorch-Examples/word_language_model/data/wikitext-2',
                     help='location of the data corpus')
 parser.add_argument('--checkpoint', type=str, default='./model.pt',
                     help='model checkpoint to use')
@@ -84,3 +84,38 @@ with open(args.outf, 'w') as outf:
 
             if i % args.log_interval == 0:
                 print('| Generated {}/{} words'.format(i, args.words))
+
+                
+
+# Load the trained model from checkpoint
+# model = torch.load(args.checkpoint, map_location=device)
+# model.eval()  # Set model to evaluation mode
+
+# # Load the corpus data
+# corpus = data.Corpus(args.data)
+# ntokens = len(corpus.dictionary)  # Total number of tokens in the dictionary
+
+# # Generate new text
+# with open(args.outf, 'w') as outf:
+#     hidden = model.init_hidden(1) if not hasattr(model, 'model_type') else None
+#     input = torch.randint(ntokens, (1, 1), dtype=torch.long).to(device)  # Start with a random word
+
+#     for i in range(args.words):
+#         if hasattr(model, 'model_type') and model.model_type == 'Transformer':
+#             output = model(input, False)
+#         else:
+#             output, hidden = model(input, hidden)
+        
+#         word_weights = output.squeeze().div(args.temperature).exp().cpu()
+#         word_idx = torch.multinomial(word_weights, 1)[0]  # Sample a word index
+#         word = corpus.dictionary.idx2word[word_idx]  # Convert index to word
+        
+#         # Append the generated word to the output file
+#         outf.write(word + ('\n' if i % 20 == 19 else ' '))
+        
+#         # Update input for the next iteration
+#         input.fill_(word_idx)
+
+#         # Log progress
+#         if i % args.log_interval == 0:
+#             print(f'| Generated {i}/{args.words} words')

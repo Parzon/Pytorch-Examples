@@ -61,7 +61,74 @@ class RNNModel(nn.Module):
         else:
             return weight.new_zeros(self.nlayers, bsz, self.nhid)
 
+# class RNNModel(nn.Module):
+#     """Container module with an encoder, a recurrent module, and a decoder."""
+#     def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False):
+#         super(RNNModel, self).__init__()  # Call to the parent class (nn.Module) initializer
+#         self.ntoken = ntoken  # Number of tokens (vocabulary size)
+#         self.drop = nn.Dropout(dropout)  # Dropout layer to prevent overfitting
+#         self.encoder = nn.Embedding(ntoken, ninp)  # Embedding layer to convert tokens to vectors
+        
+#         # Conditional initialization of the RNN based on the rnn_type
+#         if rnn_type in ['LSTM', 'GRU']:
+#             # Use PyTorch's built-in LSTM or GRU if specified
+#             self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout)
+#         else:
+#             # For RNN_TANH or RNN_RELU, manually specify nonlinearity
+#             try:
+#                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
+#             except KeyError as e:
+#                 # Handle case where rnn_type is none of the accepted values
+#                 raise ValueError("Invalid `--model` option supplied. Options are ['LSTM', 'GRU', 'RNN_TANH', 'RNN_RELU']") from e
+#             self.rnn = nn.RNN(ninp, nhid, nlayers, nonlinearity=nonlinearity, dropout=dropout)
+        
+#         self.decoder = nn.Linear(nhid, ntoken)  # Linear layer to map hidden states to vocabulary size for output
+        
+#         # Optional: tie encoder and decoder weights
+#         if tie_weights:
+#             # Ensures that nhid and emsize (input size to the embeddings) are the same when weights are tied
+#             if nhid != ninp:
+#                 raise ValueError('When using the tied flag, nhid must be equal to emsize')
+#             self.decoder.weight = self.encoder.weight
+        
+#         self.init_weights()  # Initialize weights
+        
+#         # Save important parameters
+#         self.rnn_type = rnn_type
+#         self.nhid = nhid
+#         self.nlayers = nlayers
+
+#     def init_weights(self):
+#         """Initializes weights"""
+#         initrange = 0.1
+#         nn.init.uniform_(self.encoder.weight, -initrange, initrange)  # Uniformly initialize encoder weights
+#         nn.init.zeros_(self.decoder.bias)  # Initialize decoder biases to zero
+#         nn.init.uniform_(self.decoder.weight, -initrange, initrange)  # Uniformly initialize decoder weights
+
+#     def forward(self, input, hidden):
+#         """Defines the forward pass"""
+#         emb = self.drop(self.encoder(input))  # Encode input and apply dropout
+#         output, hidden = self.rnn(emb, hidden)  # Pass through RNN
+#         output = self.drop(output)  # Apply dropout to RNN output
+#         decoded = self.decoder(output)  # Decode RNN output to token space
+#         decoded = decoded.view(-1, self.ntoken)  # Reshape for log_softmax
+#         return F.log_softmax(decoded, dim=1), hidden  # Return log probabilities and hidden state
+
+#     def init_hidden(self, bsz):
+#         """Initializes hidden state"""
+#         weight = next(self.parameters()).data  # Get data tensor of the first parameter
+#         if self.rnn_type == 'LSTM':
+#             # For LSTM, initialize both hidden and cell states
+#             return (weight.new_zeros(self.nlayers, bsz, self.nhid),
+#                     weight.new_zeros(self.nlayers, bsz, self.nhid))
+#         else:
+#             # For other RNN types, only initialize hidden state
+#             return weight.new_zeros(self.nlayers, bsz, self.nhid)
+
 # Temporarily leave PositionalEncoding module here. Will be moved somewhere else.
+        
+
+#For Transfomers
 class PositionalEncoding(nn.Module):
     r"""Inject some information about the relative or absolute position of the tokens in the sequence.
         The positional encodings have the same dimension as the embeddings, so that the two can be summed.
@@ -142,3 +209,5 @@ class TransformerModel(nn.Transformer):
         output = self.encoder(src, mask=self.src_mask)
         output = self.decoder(output)
         return F.log_softmax(output, dim=-1)
+
+

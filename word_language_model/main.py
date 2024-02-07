@@ -11,9 +11,9 @@ import data
 import model
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM/GRU/Transformer Language Model')
-parser.add_argument('--data', type=str, default='./data/wikitext-2',
+parser.add_argument('--data', type=str, default='/Users/Parzon/Downloads/GenAI/PyTorch/Pytorch-Examples/word_language_model/data/wikitext-2',
                     help='location of the data corpus')
-parser.add_argument('--model', type=str, default='LSTM',
+parser.add_argument('--model', type=str, default='Transformer',
                     help='type of network (RNN_TANH, RNN_RELU, LSTM, GRU, Transformer)')
 parser.add_argument('--emsize', type=int, default=200,
                     help='size of word embeddings')
@@ -112,12 +112,18 @@ if args.model == 'Transformer':
 else:
     model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout, args.tied).to(device)
 
+#Negative Log Likelihood Loss
 criterion = nn.NLLLoss()
 
 ###############################################################################
 # Training code
 ###############################################################################
 
+# The repackage_hidden(h) function is designed to detach the hidden states from their history in a 
+# Recurrent Neural Network (RNN) or any of its variants like LSTM or GRU. This is necessary when 
+# training RNNs to prevent the backpropagation through time (BPTT) 
+# from going back to the very start of the sequence, which can lead to computational inefficiency 
+# and the vanishing or exploding gradient problem.
 def repackage_hidden(h):
     """Wraps hidden states in new Tensors, to detach them from their history."""
 
@@ -136,6 +142,28 @@ def repackage_hidden(h):
 # done along the batch dimension (i.e. dimension 1), since that was handled
 # by the batchify function. The chunks are along dimension 0, corresponding
 # to the seq_len dimension in the LSTM.
+    
+# The get_batch function and BPTT (Backpropagation Through Time) work together to train RNNs on sequential data.
+
+# BPTT:
+# - BPTT is a technique for training RNNs where we unroll the network through time and apply backpropagation.
+# - It allows the model to learn from sequences of data by considering both current and past inputs in its predictions.
+
+# get_batch Function:
+# - This function prepares data for training by subdividing the source data into manageable chunks based on the bptt parameter.
+# - The bptt parameter represents the sequence length for each chunk, essentially defining how far back in time the model should learn dependencies.
+# - The example with a bptt-limit of 2 creates two variables, each containing a segment of the sequence to be processed by the RNN.
+
+# Relationship:
+# - The chunks created by get_batch are fed into the RNN model sequentially. Each chunk represents a timestep in the unrolled RNN for the BPTT process.
+# - During the forward pass, the RNN processes these chunks, maintaining hidden states that carry information from previous chunks (previous timesteps).
+# - In the backward pass, gradients are computed and propagated back through these unrolled timesteps, allowing the model to learn from errors at each timestep.
+# - The subdivision of data into chunks along dimension 0 (seq_len) and not along the batch dimension is crucial. 
+# - It ensures that dependencies across timesteps (within each chunk) are preserved and learned, aligning with the sequential nature of RNNs and the essence of BPTT.
+# - By training on these chunks, the model learns to predict the next element in the sequence, considering the specified sequence length (bptt), which helps in capturing short-term dependencies within that range.
+
+# In summary, get_batch prepares data in a format that supports BPTT training by creating sequences of specified lengths. BPTT utilizes these sequences to train the RNN, allowing it to learn temporal dependencies within the data.
+
 
 def get_batch(source, i):
     seq_len = min(args.bptt, len(source) - 1 - i)
@@ -143,7 +171,18 @@ def get_batch(source, i):
     target = source[i+1:i+1+seq_len].view(-1)
     return data, target
 
-
+# model.eval(): Switches to evaluation mode, affecting dropout/batch normalization.
+# hidden = model.init_hidden(eval_batch_size): Initializes hidden state for non-Transformer models.
+# with torch.no_grad(): Disables gradient computation to save memory during evaluation.
+# for i in range(..., args.bptt): Iterates over data in chunks, stepping by bptt (backpropagation through time length).
+# data, targets = get_batch(data_source, i): Retrieves a batch and its corresponding targets.
+# if args.model == 'Transformer': Checks if the model is a Transformer to handle evaluation accordingly.
+# output = model(data): Gets the model's output for the current data batch.
+# output = output.view(-1, ntokens): Reshapes Transformer output to match expected dimensions.
+# output, hidden = model(data, hidden): For RNNs, gets output and updates hidden state.
+# hidden = repackage_hidden(hidden): Detaches hidden state from the graph to prevent memory buildup.
+# total_loss += len(data) * criterion(output, targets).item(): Adds scaled loss to total loss.
+# return total_loss / (len(data_source) - 1): Calculates and returns average loss per batch.
 def evaluate(data_source):
     # Turn on evaluation mode which disables dropout.
     model.eval()
@@ -164,6 +203,18 @@ def evaluate(data_source):
     return total_loss / (len(data_source) - 1)
 
 
+# model.train(): Switches to training mode, enabling dropout.
+# hidden = model.init_hidden(args.batch_size): Initializes hidden state for each batch in non-Transformer models.
+# for batch, i in enumerate(..., args.bptt): Iterates through the dataset in chunks defined by bptt.
+# model.zero_grad(): Clears old gradients; necessary before a new backward pass.
+# if args.model == 'Transformer': Adjusts processing for Transformer model.
+# output, hidden = model(data, hidden): Gets output and updates hidden state for RNNs.
+# loss = criterion(output, targets): Calculates loss between model output and actual targets.
+# loss.backward(): Performs backpropagation, calculating gradients.
+# torch.nn.utils.clip_grad_norm_(): Prevents exploding gradients by clipping.
+# p.data.add_(p.grad, alpha=-lr): Updates model parameters using gradients.
+# print('| epoch {:3d} | ... | loss {:5.2f} | ppl {:8.2f}'): Reports training progress.
+# if args.dry_run: Breaks from the loop early for a dry run, without completing all epochs.
 def train():
     # Turn on training mode which enables dropout.
     model.train()
@@ -206,6 +257,10 @@ def train():
             break
 
 
+
+#The export_onnx function is exporting the trained PyTorch model to the Open Neural Network Exchange (ONNX) format. 
+#ONNX is an open format built to represent machine learning models. It enables models to be used across different 
+#frameworks, providing more flexibility for deploying models.
 def export_onnx(path, batch_size, seq_len):
     print('The model is also exported in ONNX format at {}.'.format(os.path.realpath(args.onnx_export)))
     model.eval()
@@ -260,3 +315,5 @@ print('=' * 89)
 if len(args.onnx_export) > 0:
     # Export the model in ONNX format.
     export_onnx(args.onnx_export, batch_size=1, seq_len=args.bptt)
+
+
